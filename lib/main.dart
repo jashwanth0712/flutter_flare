@@ -35,11 +35,12 @@ class _HomePageState extends State<HomePage> {
   bool data = false;
   TextEditingController Amt= TextEditingController();
   final myAddress = '0xD020EDf17Cec6ac28B54ff56e40D4a9aC71bD643';
+  var myData;
   @override
   void initState(){
     super.initState();
     httpClient = Client();
-    ethClient=Web3Client("https://mainnet.infura.io/v3/bd12a7232a814ca58772359386f7a2de",
+    ethClient=Web3Client("https://rinkeby.infura.io/v3/bd12a7232a814ca58772359386f7a2de",
         httpClient);
     getBalance(myAddress);
   }
@@ -50,13 +51,44 @@ class _HomePageState extends State<HomePage> {
     final contract =DeployedContract(ContractAbi.fromJson(abi, "PKCoin"),EthereumAddress.fromHex(contractAddress) );
     return contract;
   }
-  Future<List<dynamic>>query(String functionName,List<dynamic> args){
+  Future<List<dynamic>>query(String functionName,List<dynamic> args)async{
     final contract =await loadContract();
     final ethFunction = contract.function(functionName);
+    final result = await ethClient.call(contract: contract, function: ethFunction, params: args);
+
+    return result;
   }
 
   Future<void> getBalance(String targetAddress)async{
     EthereumAddress address =EthereumAddress.fromHex(targetAddress);
+    List<dynamic> result = await query("getBalance",[]);
+    myData =result[0];
+    data=true;
+    setState(() {
+
+    });
+  }
+  
+  Future<String> submit(String functionName, List<dynamic> args)async{
+    EthPrivateKey credential =EthPrivateKey.fromHex("cdf57864ee106d6d4c21e2ac8b6315c32a35a96e98ce3635c8f4858e14931578");
+    DeployedContract contract = await loadContract();
+    final ethFunction = contract.function(functionName);
+    final result = await ethClient.sendTransaction(credential, Transaction.callContract(contract: contract, function: ethFunction, parameters: args ),fetchChainIdFromNetworkId: true);
+    return result;
+
+  }
+  
+  Future<String> sendCoin()async{
+    var bigAmouunt=BigInt.from(int.tryParse(Amt.text));
+    var response = await submit("depositeBalance",[bigAmouunt]);
+    print("deposited");
+    return response;
+  }
+  Future<String> withdrawCoin()async{
+    var bigAmouunt=BigInt.from(int.parse(Amt.text));
+    var response = await submit("withdrawBalance",[bigAmouunt]);
+    print("withdrawn");
+    return response;
   }
   @override
   Widget build(BuildContext context) {
@@ -76,7 +108,7 @@ class _HomePageState extends State<HomePage> {
             "Balance".text.gray700.xl2.semiBold.makeCentered(),
             10.heightBox,
             data
-                ? "\$1".text.bold.xl6.makeCentered()
+                ? "\$$myData".text.bold.xl6.makeCentered().shimmer()
                 : CircularProgressIndicator().centered()
           ]))
               .p16
@@ -89,19 +121,19 @@ class _HomePageState extends State<HomePage> {
           30.heightBox,
           HStack([
             FlatButton.icon(
-                onPressed: () {},
+                onPressed: () {getBalance(myAddress);},
                 color: Colors.blue,
                 shape: Vx.roundedSm,
                 icon: Icon(Icons.refresh, color: Colors.white,),
                 label: "Refresh".text.white.make()),
             FlatButton.icon(
-                onPressed: () {print(Amt.text);},
+                onPressed: () {sendCoin();},
                 color: Colors.green,
                 shape: Vx.roundedSm,
                 icon: Icon(Icons.call_made_outlined, color: Colors.white,),
                 label: "Deposit".text.white.make()),
             FlatButton.icon(
-                onPressed: () {},
+                onPressed: () {withdrawCoin();},
                 color: Colors.red,
                 shape: Vx.roundedSm,
                 icon: Icon(Icons.call_received_outlined, color: Colors.white,),
